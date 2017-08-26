@@ -17,8 +17,8 @@ class Tags {
 private:
     enum token {
         leftSharpExpected, tagNameExpected, attrNameExpected, equalitySignExpected,
-        openingQuotationMarkExpected, attrValueExpected,
-        endOfTagOrNestedTagNameExpected, endOfTag, rightSharpOrNextAttrNameExpected
+        openingQuotationMarkExpected, attrValueExpected, endOfTagExpected, canBeFinishedTag,
+        endOfTagOrNestedTagNameExpected, endOfTag, rightSharpOrNextAttrNameExpected, emptyTagToken
     };
 
     const int maxNameSize;
@@ -30,16 +30,20 @@ private:
     Attribute getAtribute(const std::string &tagName);
 
     void putNewTag(std::unordered_map<std::string, Attribute>& map, std::string tagName,
-                   std::string attrName, std::string attrValue) {
+                   Attribute &atr) {
 
-        Attribute newAttr(attrName, attrValue);
-        std::pair<std::string, Attribute> newTag(tagName, newAttr);
+        std::pair<std::string, Attribute> newTag(tagName, atr);
         map.insert(newTag);
     }
 
     void ignoreExtraSigns(std::stringstream &ss) {
         while(ss.peek() == ' ' || ss.peek() == '\n')
             ss.ignore();
+    }
+
+    Attribute* clearActualData(Attribute* ptr) {
+        delete ptr;
+        return NULL;
     }
 
 public:
