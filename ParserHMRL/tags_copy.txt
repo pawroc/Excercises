@@ -1,0 +1,193 @@
+#include "tags.h"
+
+using namespace std;
+
+Tags::Tags() : maxNameSize(30)
+{
+
+}
+
+Attribute Tags::getAtribute(const string& tagName) {
+    return Attribute("af", "bdf");
+}
+
+string Tags::getTag(const string& cmd) {
+    return "aa";
+}
+
+bool Tags::putData(stringstream& ss) {
+    char tagName[maxNameSize], attrName[maxNameSize], attrValue[maxNameSize];
+    string sAppendedTagName, sPreviousTagName;
+    char c, equalitySign;
+    bool isNestedTag = false;   //token giving info if it is nested tag or not. If so, append tags until end of tag is met.
+    Attribute newAttr;
+    unordered_map<std::string, Attribute> tempMapOfTags;
+    stack<char*> stackOfTagNames;
+
+    token tok = leftSharpExpected;
+
+    //there should be a while loop working until enf of token is met
+    while(tok != endOfTag) {
+        switch(tok) {
+
+        case leftSharpExpected:
+            //get one character and check if it is '<'
+            ss.get(c);
+            if(c != '<') {
+                cout << "Bad format! '<' is expected!";
+                return false;
+            }
+            tok = tagNameExpected;
+            break;
+
+        case tagNameExpected:
+            //get tagName...
+            ss.get(tagName, maxNameSize, ' ');
+            //...and check if the next character is space.
+            ss.get(c);
+            if(c != ' ') {
+                cout << "Bad format! Space sign after tagName is expected!";
+                return false;
+            }
+
+            stackOfTagNames.push(tagName);
+
+            //check if it is nested tag. If so, append tag names -> tag1.tag2.tag3...
+            if(isNestedTag) {
+                if(!sPreviousTagName.compare(tagName)) {
+                    cout << "Tag name has to be unique! " << sPreviousTagName << " and "
+                         << tagName << " are equal!\n";
+                    return false;
+                }
+                sAppendedTagName = sPreviousTagName;
+                sAppendedTagName += ".";
+                sAppendedTagName += tagName;
+            }
+            tok = attrNameExpected;
+            break;
+
+        case attrNameExpected:
+            //get attrName...
+            ss.get(attrName, maxNameSize, ' ');
+            //...and check if the next character is space.
+            ss.get(c);
+            if(c != ' ') {
+                cout << "Bad format! Space sign after attrName is expected!";
+                return false;
+            }
+            tok = equalitySignExpected;
+            break;
+
+        case equalitySignExpected:
+            //check if the nex character is '='...
+            ss.get(equalitySign);
+            if(equalitySign != '=') {
+                cout << "Bad format! Expected '=' sign after attrName!";
+                return false;
+            }
+            //...and check if the next character is space.
+            ss.get(c);
+            if(c != ' ') {
+                cout << "Bad format! Space sign is expected after '=' sign!";
+                return false;
+            }
+            tok = openingQuotationMarkExpected;
+            break;
+
+        case openingQuotationMarkExpected:
+            //check if the next character is "
+            ss.get(c);
+            if(c != '\"') {
+                cout << "Bad format! Opening \" sign expected!";
+                return false;
+            }
+            tok = attrValueAndClosingQuotationMarkExpected;
+            break;
+
+        case attrValueAndClosingQuotationMarkExpected:
+            //get attrValue...
+            ss.get(attrValue, maxNameSize, '\"');
+            //...and check if the next character is ".
+            ss.get(c);
+            if(c != '\"') {
+                cout << "Bad format! Closing \" sign expected!";
+                return false;
+            }
+            tok = rightSharpExpected;
+            break;
+
+        case rightSharpExpected:
+            //check if the next character is >
+            ss.get(c);
+            if(c != '>') {
+                cout << "Bad format! '>' is expected!";
+                return false;
+            }
+            tok = endOfTagOrNestedTagNameExpected;
+            break;
+
+        case endOfTagOrNestedTagNameExpected:
+            //check if the next character is <...
+            ss.ignore(1,'\n');  //ignore new line sign
+            ss.get(c);
+            if(c != '<') {
+                cout << "End of tag '</tagName>' or nested tag opening sharp bracket '<' is expected!";
+                return false;
+            }
+            //and peek the next character to check whether it is the end of tag or there is nested tag
+            if(ss.peek() == '/') {  //check the next character without exctracting it
+                //it is the end of tag
+                ss.ignore(1);   //ignore '/' character
+//                ss.get(c);  // get '/' character from stream
+
+                //check if the end of tag comply with the processed tag
+                while(!stackOfTagNames.empty()) {
+                    char* tempTagName;
+                    ss.get(tempTagName, maxNameSize, '>');
+
+                    //there should appear ends of tags
+                    if(strcmp(tempTagName, stackOfTagNames.top())) {
+                        cout << "Bad format! End of tag token does not comply with the tag name!";
+                        return false;
+                    }
+                    stackOfTagNames.pop();
+                    //check if the next character is >
+                    ss.get(c);
+                    if(c != '>') {
+                        cout << "Bad format! '>' is expected!";
+                        return false;
+                    }
+                    //put a new tag
+                    if(isNestedTag)
+                        putNewTag(tempMapOfTags, newAttr, sAppendedTagName, attrName, attrValue);
+                    else
+                        putNewTag(tempMapOfTags, newAttr, tagName, attrName, attrValue);
+                }
+                mapOfTags = tempMapOfTags;
+//                mapOfTags.insert(tempMapOfTags.begin(), tempMapOfTags.end());
+                tok = endOfTag;
+            } else {
+                //there will be nested tag
+                isNestedTag = true;
+                putNewTag(tempMapOfTags, newAttr, tagName, attrName, attrValue);    //save tag to the temporary map
+                sPreviousTagName.assign(tagName);   //save previous tagName. It is necessery for appending in the next step
+                tok = tagNameExpected;
+            }
+            break;
+        }
+    }
+    return true;
+}
+
+void Tags::printContent()
+{
+    cout << "============\n";
+    cout << "  CONTENT   \n";
+    cout << "============\n\n";
+
+    for(auto& v : mapOfTags) {
+        cout << v.first << ", " << v.second << "\n";
+    }
+}
+
+
