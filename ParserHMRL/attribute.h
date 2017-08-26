@@ -12,9 +12,7 @@ private:
 
 public:
     Attribute(std::string name = "Unknown", std::string value = "Unknown") {
-        attributes.insert(std::pair<std::string, std::string>(name, value));
-        attrName = name;
-        attrValue = value;
+        insertAttribute(name, value);
     }
     Attribute(const Attribute& orig) {
         attributes = orig.attributes;
@@ -32,6 +30,11 @@ public:
     }
 
     void putAttribute(std::string name, std::string value) { attrName = name; attrValue = value; }
+
+    void insertAttribute(std::string name, std::string value) {
+        attributes.insert(std::pair<std::string, std::string>(name, value));
+    }
+
     friend std::ostream& operator<< (std::ostream& os, Attribute& attr);
 };
 

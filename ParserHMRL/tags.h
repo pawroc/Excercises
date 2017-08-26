@@ -17,7 +17,7 @@ class Tags {
 private:
     enum token {
         leftSharpExpected, tagNameExpected, attrNameExpected, equalitySignExpected,
-        openingQuotationMarkExpected, attrValueExpected, rightSharpExpected,
+        openingQuotationMarkExpected, attrValueExpected,
         endOfTagOrNestedTagNameExpected, endOfTag, rightSharpOrNextAttrNameExpected
     };
 
@@ -35,6 +35,11 @@ private:
         Attribute newAttr(attrName, attrValue);
         std::pair<std::string, Attribute> newTag(tagName, newAttr);
         map.insert(newTag);
+    }
+
+    void ignoreExtraSigns(std::stringstream &ss) {
+        while(ss.peek() == ' ' || ss.peek() == '\n')
+            ss.ignore();
     }
 
 public:

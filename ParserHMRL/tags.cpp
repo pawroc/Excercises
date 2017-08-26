@@ -41,11 +41,12 @@ string Tags::getTag(const string& cmd) {
 bool Tags::putData(stringstream& ss) {
     char tagName[maxNameSize], attrName[maxNameSize], attrValue[maxNameSize], checkTagName[maxNameSize];
     string sAppendedTagName, sPreviousTagName("");
-    char c, equalitySign;
+    char ch, equalitySign;
     bool isNestedTag = false;   //token giving info if it is nested tag or not. If so, append tags until end of tag is met.
     unordered_map<std::string, Attribute> tempMapOfTags;
     stack<string> stackOfTagNames;
     stringstream msg;
+    Attribute* pAttr = NULL;
 
     token tok = leftSharpExpected;
 
@@ -54,123 +55,112 @@ bool Tags::putData(stringstream& ss) {
         switch(tok) {
 
         case leftSharpExpected:
-            ss.get(c);
-            if(c != '<') {
+        {
+            ignoreExtraSigns(ss);
+            ss.get(ch);
+            if(ch != '<') {
                 msg << "Syntax is incorrect: '<' is expected!\n";
                 throw msg.str();
             }
             tok = tagNameExpected;
             break;
+        }
 
         case tagNameExpected:
+        {
+            ignoreExtraSigns(ss);
             ss.getline(tagName, maxNameSize, ' ');
-            if(sPreviousTagName.compare(tagName)) {
-                string sTagName(tagName);
-                stackOfTagNames.push(sTagName);
-                if(isNestedTag) {
-                    sAppendedTagName = sPreviousTagName;
-                    sAppendedTagName += ".";
-                    sAppendedTagName += tagName;
-                }
-            }else {
-                msg << "The name " << tagName << " already exists! Tag names have to be unique!\n";
-                throw msg.str();
+            string sTagName(tagName);
+            stackOfTagNames.push(sTagName);
+            if(isNestedTag) {
+                sAppendedTagName = sPreviousTagName;
+                sAppendedTagName += ".";
+                sAppendedTagName += tagName;
             }
             tok = attrNameExpected;
             break;
+        }
 
         case attrNameExpected:
+        {
+            ignoreExtraSigns(ss);
             ss.getline(attrName, maxNameSize, ' ');
             tok = equalitySignExpected;
             break;
+        }
 
         case equalitySignExpected:
-            ss.get(equalitySign);
-            if(equalitySign != '=') {
+        {
+            ignoreExtraSigns(ss);
+            ss.get(ch);
+            if(ch != '=') {
                 msg << "Syntax is incorrect: '=' is expected!\n";
                 throw msg.str();
             }
-            ss.ignore();    //ignore space after '='
             tok = openingQuotationMarkExpected;
             break;
+        }
 
         case openingQuotationMarkExpected:
-            ss.get(c);
-            if(c != '\"') {
+        {
+            ignoreExtraSigns(ss);
+            ss.get(ch);
+            if(ch != '\"') {
                 msg << "Syntax is incorrect: opening '\"' is expected!\n";
                 throw msg.str();
             }
             tok = attrValueExpected;
             break;
+        }
 
         case attrValueExpected:
+        {
             ss.getline(attrValue, maxNameSize, '\"');
             tok = rightSharpOrNextAttrNameExpected;
             break;
+        }
 
         case rightSharpOrNextAttrNameExpected:
-            while(ss.peek() == '\n')
-                ss.ignore();
-            if(ss.peek() == '>')
-                tok = rightSharpExpected;
-            else if(ss.peek() == ' ') {
+        {
+            ignoreExtraSigns(ss);
+            if(ss.peek() == '>') {
+                if(pAttr)
+                    pAttr->insertAttribute(attrName, attrValue);
+                    tok = endOfTagOrNestedTagNameExpected;
+            }else if(ss.peek() == ' ') {
+                ////////////////////////////////////////////////////////////////////////////////////////////
+                pAttr = new Attribute(attrName, attrValue);
                 tok = attrNameExpected;
-                ss.ignore();
-            }
-            else {
+            }else {
                 msg << "Syntax is incorrect: space or '>' is expected!\n";
                 throw msg.str();
             }
+            ss.ignore();
             break;
-
-        case rightSharpExpected:
-            ss.get(c);
-            if(c != '>') {
-                msg << "Syntax is incorrect: '>' is expected!\n";
-                throw msg.str();
-            }
-            tok = endOfTagOrNestedTagNameExpected;
-            break;
+        }
 
         case endOfTagOrNestedTagNameExpected:
-            while(ss.peek() == '\n')
-                ss.ignore();
-//            ss.get(c);
-//            if(c != '\n') {
-//                msg << "Syntax error: new line '\\n' sign is expected after '>'!";
-//                throw msg.str();
-//            }
-            ss.get(c);
-            if(c != '<') {
+        {
+            ignoreExtraSigns(ss);
+            ss.get(ch);
+            if(ch != '<') {
                 msg << "Syntax is incorrect: '<' at the end of Tag is expected!\n";
                 throw msg.str();
             }
 
             if(ss.peek() == '/') {
                 //this is the end of Tag
-
-                while(!stackOfTagNames.empty()) {
+                if(!stackOfTagNames.empty()) {
                     ss.ignore();
                     ss.getline(checkTagName, maxNameSize, '>');
 
                     if((stackOfTagNames.top()).compare(checkTagName)) {
-                        //                    if(strcmp(checkTagName, stackOfTagNames.top())) {
                         stringstream msg;
                         msg << "Syntax is incorrect: </" << checkTagName << "> does not comply with </"
                             << stackOfTagNames.top() << ">!\n";
                         throw msg.str();
                     }
                     stackOfTagNames.pop();
-                    if(ss.peek() == '\n')
-                        ss.ignore();
-
-                    if(ss.peek() == '<') {
-                        ss.ignore();
-                        if(ss.peek() != '/') {
-                            msg << "Syntax is incorrect: there is lack of '/' sign in end of tag!\n";
-                            throw msg.str();
-                        }
-                    }
                 }
 
                 if(isNestedTag)
@@ -188,6 +178,7 @@ bool Tags::putData(stringstream& ss) {
             }
             break;
         }
+        }
     }
     return true;
 }
@@ -202,5 +193,3 @@ void Tags::printContent()
         cout << v.first << ", " << v.second << "\n";
     }
 }
-
-
