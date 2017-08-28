@@ -39,12 +39,13 @@ string Tags::getTag(const string& cmd) {
 }
 
 bool Tags::putData(stringstream& ss) {
-    char actualTagName[maxNameSize];
+    string sActualTagName, sActualAttrName, sActualAttrValue;
     char actualAttrName[maxNameSize];
     char actualAttrValue[maxNameSize];
     char actualCheckTagName[maxNameSize];
     string sFinalTagName;// sActualTagName;
     char ch;
+    int counter;
 
     //token giving info if it is nested tag or not. If so, append tags until end of tag is met.
     bool isNestedTag = false;
@@ -57,79 +58,79 @@ bool Tags::putData(stringstream& ss) {
     token tok = leftSharpExpected;
 
     //there should be a while loop working until end of token is met
-    while(tok != endOfTag) {
+    while(tok != endOfTags) {
         switch(tok) {
 
         case leftSharpExpected:
         {
             ignoreExtraSigns(ss);
             ss.get(ch);
-            if(ch == '<') {
-                if(ss.peek() == '/'){
-                    ss.ignore();
-                    tok = endOfTagExpected;
-                } else {
-                    tok = tagNameExpected;
-                    if(!stackOfTagNames.empty())
-                        isNestedTag = true;
-                }
-            } else {
-                msg << "Syntax is incorrect: '<' is expected!\n";
-                throw msg.str();
+            if(ch != '<') {
+                msg << "Syntax error! There should be '<' sign!\n";
+                throw msg;
             }
+            tok = tagNameOrEndOfTagExpected;
             break;
         }
 
-        case tagNameExpected:
+        case tagNameOrEndOfTagExpected:
         {
+            pAttr = new Attribute();    //create a new empty attribute
+
             ignoreExtraSigns(ss);
             ss.get(ch);
-            string sActualTagName;
-            sActualTagName += ch;
-            while(ch != ' ' && ch != '>') {
-                ss.get(ch);
-                if(ch == '>') {
-                    if(!pAttr) {
-                        pAttr = new Attribute("", "");
-                    }else {
-                        pAttr->insertAttribute("", "");
-                    }
-
-                    //SAVE TAG
-                    putNewTag(tempMapOfTags, sActualTagName, *pAttr);
-                    pAttr = clearActualData(pAttr);
-                    stackOfTagNames.push(sActualTagName);
-                    tok = emptyTagToken;
-                    break;
-                }
-                if (ch != ' ')
-                    sActualTagName += ch;
-            }
-            if(tok == emptyTagToken) {
-                sActualTagName.clear();
-                tok = leftSharpExpected;
+            if(ch == '/') {
+                tok = endOfTagExpected;
                 break;
             }
-
-//            ss.getline(actualTagName, maxNameSize, ' ');
-//            string sActualTagName(actualTagName);
-            stackOfTagNames.push(sActualTagName);
-            if(isNestedTag) {
-                //                sFinalTagName = sPreviousTagName;
-                sFinalTagName += ".";
-                sFinalTagName += sActualTagName;
-            } else {
-                sFinalTagName = sActualTagName;
+            sActualTagName += ch;
+            counter = 0;
+            while(counter++ < maxNameSize) {
+                //Get characters until space or '>'
+                ss.get(ch);
+                if(ch == '>') {                                         //the end of tag
+                    putNewTag(tempMapOfTags, sActualTagName, *pAttr);   //insert attribute to the temp memory...
+                    stackOfTagNames.push(sActualTagName);
+                    if(!stackOfTagNames.empty()) {
+                        //it is nested tag
+                        sFinalTagName += "." + sActualTagName;
+                    }else {
+                        //it is not nested tag
+                        sFinalTagName = sActualTagName;
+                    }
+                    sActualTagName.clear();                             //...clear the actual tag name string...
+                    break;                                              //...and leave the same token, because now '<' is again expected.
+                } else if(ch == ' ') {                                  //space -> attrName expected
+                    tok = attrNameExpected;
+                    break;
+                }
+                sActualTagName += ch;
             }
-            tok = attrNameExpected;
             break;
         }
 
         case attrNameExpected:
         {
             ignoreExtraSigns(ss);
-            ss.getline(actualAttrName, maxNameSize, ' ');
-            tok = equalitySignExpected;
+            ss.get(ch);
+            if(ch == '=') { //check if there is any attribute name. If no, throw exception
+                msg << "Syntax error! There should be attribute name!\n";
+                throw msg;
+            }
+            //There is any attribute name -> continue
+            sActualAttrName += ch;
+            counter = 0;
+            while(counter++ < maxNameSize) {
+                ss.get(ch);
+                if(ch == ' ') {
+                    tok = equalitySignExpected;
+                    break;
+                }else if(ch == '=') {
+                    tok = openingQuotationMarkExpected;
+                    break;
+                }
+                sActualAttrName += ch;
+            }
             break;
         }
 
@@ -138,8 +139,8 @@ bool Tags::putData(stringstream& ss) {
             ignoreExtraSigns(ss);
             ss.get(ch);
             if(ch != '=') {
-                msg << "Syntax is incorrect: '=' is expected!\n";
-                throw msg.str();
+                msg << "Syntax error! There should be '=' sign!\n";
+                throw msg;
             }
             tok = openingQuotationMarkExpected;
             break;
@@ -150,8 +151,8 @@ bool Tags::putData(stringstream& ss) {
             ignoreExtraSigns(ss);
             ss.get(ch);
             if(ch != '\"') {
-                msg << "Syntax is incorrect: opening '\"' is expected!\n";
-                throw msg.str();
+                msg << "Syntax error! There should be opening '\"' sign!\n";
+                throw msg;
             }
             tok = attrValueExpected;
             break;
@@ -159,8 +160,16 @@ bool Tags::putData(stringstream& ss) {
 
         case attrValueExpected:
         {
-            ss.getline(actualAttrValue, maxNameSize, '\"');
-            tok = rightSharpOrNextAttrNameExpected;
+            ignoreExtraSigns(ss);
+            counter = 0;
+            while(counter++ < maxNameSize) {
+                ss.get(ch);
+                if(ch == '\"') {
+                    tok = rightSharpOrNextAttrNameExpected;
+                    break;
+                }
+                sActualAttrValue += ch;
+            }
             break;
         }
 
@@ -168,23 +177,33 @@ bool Tags::putData(stringstream& ss) {
         {
             ignoreExtraSigns(ss);
             if(ss.peek() == '>') {
-                if(!pAttr) {
-                    pAttr = new Attribute(actualAttrName, actualAttrValue);
-                }else {
-                    pAttr->insertAttribute(actualAttrName, actualAttrValue);
-                }
-
-                //SAVE TAG
-                putNewTag(tempMapOfTags, sFinalTagName, *pAttr);
-                pAttr = clearActualData(pAttr);
+                //SAVE TAG and delete pAttr
                 ss.ignore();
+                if(pAttr) { //if pAttr does not exist, create new and insert it
+//                    pAttr = new Attribute();
+                    if(!stackOfTagNames.empty()) {
+                        //it is nested tag
+                        sFinalTagName += "." + sActualTagName;
+                    }else {
+                        //it is not nested tag
+                        sFinalTagName = sActualTagName;
+                    }
+                    pAttr->insertAttribute(sActualAttrName, sActualAttrValue);
+                    putNewTag(tempMapOfTags,sFinalTagName, *pAttr);
+                    stackOfTagNames.push(sActualTagName);
+                    clearActualData(pAttr);
+                    sActualTagName.clear();
+                }else { //else just insert next attribut value to the existing attribute
+                    pAttr->insertAttribute(sActualAttrName, sActualAttrValue);
+                }
+                sActualAttrName.clear();
+                sActualAttrValue.clear();
                 tok = leftSharpExpected;
             }else {
-                if(!pAttr) {
-                    pAttr = new Attribute(actualAttrName, actualAttrValue);
-                }else {
-                    pAttr->insertAttribute(actualAttrName, actualAttrValue);
-                }
+                //INSERT new attribute name and value to the existing attribute
+                pAttr->insertAttribute(sActualAttrName, sActualAttrValue);
+                sActualAttrName.clear();
+                sActualAttrValue.clear();
                 tok = attrNameExpected;
             }
             break;
@@ -192,17 +211,18 @@ bool Tags::putData(stringstream& ss) {
 
         case endOfTagExpected:
         {
-            if(!stackOfTagNames.empty()) {
-                ignoreExtraSigns(ss);
-                ss.getline(actualCheckTagName, maxNameSize, '>');
-
-                if((stackOfTagNames.top()).compare(actualCheckTagName)) {
-                    stringstream msg;
-                    msg << "Syntax is incorrect: </" << actualCheckTagName << "> does not comply with </"
-                        << stackOfTagNames.top() << ">!\n";
-                    throw msg.str();
+            counter = 0;
+            string endTagName;
+            while(counter++ < maxNameSize) {
+                ss.get(ch);
+                if(ch == '>') {
+                    break;
                 }
-                stackOfTagNames.pop();
+                endTagName += ch;
+            }
+            if(!endTagName.compare(stackOfTagNames.top())) {
+                //Comparing tag names are the same
+                stackOfTagNames.pop();  //erase tag name from stack
 
                 //Actualize actualTagName! If it was a.b.c, make it -> a.b (because c was just erased)
                 size_t pos = sFinalTagName.rfind('.');
@@ -210,23 +230,31 @@ bool Tags::putData(stringstream& ss) {
                     sFinalTagName.erase(pos);
                 else {
                     sFinalTagName.clear();
-                    mapOfTags = tempMapOfTags;
-                    tok = canBeFinishedTag;
+                    //check whether it is end of file (commands) or not
+                    ignoreExtraSigns(ss);
+                    if(ss.eof()) {
+                        mapOfTags = tempMapOfTags;
+                        tok = endOfTags;
+                    }
+                    else
+                        tok = leftSharpExpected;
+
                     break;
                 }
-                tok = leftSharpExpected;
-            } else {
-                isNestedTag = false;
-            }
-        }
 
-        case canBeFinishedTag:
-        {
-            ignoreExtraSigns(ss);
-            if(ss.eof())
-                tok = endOfTag;
-            else
-                tok = leftSharpExpected;
+                ignoreExtraSigns(ss);
+                if(ss.peek() == '<') {
+                    //there will be next command
+                    tok = leftSharpExpected;
+                }else {
+                    //it is end of file, but to be certain - check it before finishing
+                    tok = endOfTags;
+                }
+            }else {
+                //Comparing names are not the same
+                msg << "Syntax error! " << endTagName << " is not the same as " << stackOfTagNames.top() << "!\n";
+                throw msg;
+            }
             break;
         }
         }

@@ -11,7 +11,8 @@ private:
     std::string attrValue;
 
 public:
-    Attribute(std::string name, std::string);
+    Attribute() {}
+    Attribute(std::string name, std::string value);
     Attribute(const Attribute& orig);
 
     bool isAttrName(std::string name);

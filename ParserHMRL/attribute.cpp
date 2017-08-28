@@ -1,6 +1,6 @@
 #include "attribute.h"
 
-Attribute::Attribute(std::string name = "", std::string value = "") {
+Attribute::Attribute(std::string name, std::string value) {
     insertAttribute(name, value);
 }
 

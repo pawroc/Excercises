@@ -18,7 +18,8 @@ private:
     enum token {
         leftSharpExpected, tagNameExpected, attrNameExpected, equalitySignExpected,
         openingQuotationMarkExpected, attrValueExpected, endOfTagExpected, canBeFinishedTag,
-        endOfTagOrNestedTagNameExpected, endOfTag, rightSharpOrNextAttrNameExpected, emptyTagToken
+        endOfTagOrNestedTagNameExpected, endOfTags, rightSharpOrNextAttrNameExpected, emptyTagToken,
+        tagNameOrEndOfTagExpected
     };
 
     const int maxNameSize;
@@ -30,7 +31,7 @@ private:
     Attribute getAtribute(const std::string &tagName);
 
     void putNewTag(std::unordered_map<std::string, Attribute>& map, std::string tagName,
-                   Attribute &atr) {
+                   Attribute atr) {
 
         std::pair<std::string, Attribute> newTag(tagName, atr);
         map.insert(newTag);
