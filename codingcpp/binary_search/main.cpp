@@ -2,6 +2,7 @@
 #include <array>
 #include <cmath>
 #include <optional>
+#include <vector>
 
 int recursiveBinarySearch(const std::vector<int> &vec, int left, int right, int lookup){
     if (right >= left) {
@@ -11,9 +12,9 @@ int recursiveBinarySearch(const std::vector<int> &vec, int left, int right, int 
             return true;
   
         if (vec[mid] > lookup)
-            return ownBinarySearch(vec, left, mid - 1, lookup);
+            return recursiveBinarySearch(vec, left, mid - 1, lookup);
   
-        return ownBinarySearch(vec, mid + 1, right, lookup);
+        return recursiveBinarySearch(vec, mid + 1, right, lookup);
     }
   
     return false;
@@ -62,15 +63,13 @@ std::optional<size_t> find2(std::array<int, N> arr, int val)
     size_t b = 0;
     size_t e = arr.size() - 1;
 
-    std::optional<size_t> result{std::nullopt};
-
-    while (e - b > 1 and not result)
+    while (b <= e)
     {
         size_t idx = (e + b) / 2;
 
         if (arr[idx] == val)
         {
-            result = idx;
+            return {idx};
         }
         else if (arr[idx] > val)
         {
@@ -82,16 +81,7 @@ std::optional<size_t> find2(std::array<int, N> arr, int val)
         }
     }
 
-    if (not result and arr[b] == val)
-    {
-        result = b;
-    }
-    else if (not result and arr[e] == val)
-    {
-        result = e;
-    }
-
-    return result;
+    return std::nullopt;
 }
 
 int main()
